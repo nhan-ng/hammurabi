@@ -99,7 +99,17 @@ func DisplayGameState(year int, state *GameState, delta *StateDelta) {
 }
 
 // Transition transitions the given game state to the next.
-func Transition(currState *GameState, action *GameAction) (*GameState, *StateDelta) {
+func Transition(currState *GameState, action *GameAction) (*GameState, *StateDelta, error) {
+	// Validate action
+	err := validateAction(action)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Do magic here
-	return nil, nil
+	return nil, nil, nil
+}
+
+func validateAction(action *GameAction) error {
+	return nil
 }

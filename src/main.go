@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"log"
 
-	"./hammurabi"
+	"./cmd"
 )
 
 const (
@@ -20,11 +20,7 @@ Rule wisely and you will be showered with appreciation at the end of your term. 
 )
 
 func main() {
-	fmt.Println(intro)
-	// reader := bufio.NewReader(os.Stdin)
-
-	maxYear := 10
-	// Create a new game
-	s, d := hammurabi.NewGame(maxYear)
-	hammurabi.DisplayGameState(1, s, d)
+	if err := cmd.NewHammurabiCmd().Execute(); err != nil {
+		log.Println(err)
+	}
 }

@@ -7,7 +7,7 @@ Hammurabi is CLI application written in Golang for playing the classic text-base
 - [Introduction](#introduction)
 - [Usage](#usage)
   - [Build](#build)
-    - [Wndows](#wndows)
+    - [Windows](#windows)
     - [Linux](#linux)
   - [Interactive Play](#interactive-play)
   - [Artifical Intelligence Plugin](#artifical-intelligence-plugin)
@@ -23,10 +23,9 @@ Congratulations, you are the newest ruler of ancient Samaria, elected for a ten 
 Rule wisely and you will be showered with appreciation at the end of your term. Rule poorly and you will be kicked out of office!
 
 # Usage #
-Build the binary for the application
-
 ## Build ##
-### Wndows ###
+Build the binary for the application
+### Windows ###
 ```console
 PS go build -o hammurabi.exe
 PS .\hammurabi.exe help

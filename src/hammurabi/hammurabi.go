@@ -1,7 +1,11 @@
 package hammurabi
 
 import (
+	"bufio"
 	"fmt"
+	"math/rand"
+	"strconv"
+	"strings"
 )
 
 // GameState describes the current resource state of the game.
@@ -15,35 +19,42 @@ type GameState struct {
 
 // GameAction describes the player's action given a game state.
 type GameAction struct {
-	LandToBuy    int
-	BushelToFeed int
-	LandToSeed   int
+	LandsToBuy    int
+	BushelsToFeed int
+	LandsToSeed   int
 }
 
 // StateDelta captures the changes made to the game state from the transition of the previous year to the next.
 type StateDelta struct {
-	PeopleStarved int
-	PeopleKilled  int
-	PeopleAdded   int
-	BushelLost    int
-	HasRat        bool
-	HasPlague     bool
+	PeopleStarved   int
+	PeopleKilled    int
+	PeopleAdded     int
+	BushelsInfested int
+	HasRat          bool
+	HasPlague       bool
 }
 
 const (
-	bushelsPerPerson  = 20
-	maxLandsPerPerson = 10
+	bushelsPerPerson = 20
+	landsPerPerson   = 10
+	bushelsPerLand   = 1
 
-	minRatPercentage = 0
-	maxRatPercentage = 0.4
+	minRatPercentage = 0.1
+	maxRatPercentage = 0.3
+
+	uprisingThreshold = 0.45
 
 	plagueChance = 0.15
+	ratChance    = 0.40
 
 	minLandPrice = 17
 	maxLandPrice = 26
 
-	minNewPeople = 2
-	maxNewPeople = 5
+	minLandProfit = 1
+	maxLandProfit = 4
+
+	minNewcomers = 2
+	maxNewcomers = 5
 
 	initialPopulation = 100
 	initialBushels    = 2800
@@ -51,20 +62,20 @@ const (
 	initialLandPrice  = 22
 	initialLandProfit = 3
 
-	initialNewPeople  = 5
-	initialBushelLost = 200
+	initialNewPeople       = 5
+	initialBushelsInfested = 200
 )
 
 // NewGame creates a new game with the maximum number of years, aka turns.
 func NewGame(maxYear int) (*GameState, *StateDelta) {
 	// Create a fixed initial state delta
 	delta := &StateDelta{
-		PeopleStarved: 0,
-		PeopleKilled:  0,
-		PeopleAdded:   initialNewPeople,
-		BushelLost:    initialBushelLost,
-		HasRat:        true,
-		HasPlague:     false,
+		PeopleStarved:   0,
+		PeopleKilled:    0,
+		PeopleAdded:     initialNewPeople,
+		BushelsInfested: initialBushelsInfested,
+		HasRat:          true,
+		HasPlague:       false,
 	}
 
 	// Create a fixed initial state
@@ -89,7 +100,7 @@ func DisplayGameState(year int, state *GameState, delta *StateDelta) {
 	fmt.Printf("The city now owns %d acres.\n", state.Lands)
 	fmt.Printf("You harvested %d bushels per acre.\n", state.LandProfit)
 	if delta.HasRat {
-		fmt.Printf("Rats ate %d bushels.\n", delta.BushelLost)
+		fmt.Printf("Rats ate %d bushels.\n", delta.BushelsInfested)
 	}
 	if delta.HasPlague {
 		fmt.Printf("Plague killed %d people.\n", delta.PeopleKilled)
@@ -98,18 +109,259 @@ func DisplayGameState(year int, state *GameState, delta *StateDelta) {
 	fmt.Printf("Land is trading at %d bushels per acre.\n", state.LandPrice)
 }
 
-// Transition transitions the given game state to the next.
-func Transition(currState *GameState, action *GameAction) (*GameState, *StateDelta, error) {
-	// Validate action
-	err := validateAction(action)
+// ReadActionInput reads the input and parse it to GameAction
+func ReadActionInput(reader *bufio.Reader) (action *GameAction, err error) {
+	fmt.Println("Input your action with the following format:")
+	fmt.Println("[LandsToBuy] [BushelsToFeed] [LandsToSeed]")
+	text, err := reader.ReadString('\n')
 	if err != nil {
-		return nil, nil, err
+		return
 	}
 
-	// Do magic here
-	return nil, nil, nil
+	// Initialize game action
+	input := strings.Fields(text)
+
+	// Parse the input
+	action = &GameAction{}
+	action.LandsToBuy, err = strconv.Atoi(input[0])
+	if err != nil {
+		return
+	}
+	action.BushelsToFeed, err = strconv.Atoi(input[1])
+	if err != nil {
+		return
+	}
+	action.LandsToSeed, err = strconv.Atoi(input[2])
+	return
 }
 
-func validateAction(action *GameAction) error {
+// Transition transitions the given game state to the next.
+func Transition(year int, state *GameState, action *GameAction) (nextYear int, nextState *GameState, delta *StateDelta, err error) {
+	// Validate parameters
+	if state == nil {
+		err = &NilGameState{}
+		return
+	}
+	if action == nil {
+		err = &NilGameAction{}
+		return
+	}
+	if err = action.validate(); err != nil {
+		return
+	}
+
+	// Initialize the next game state and delta
+	nextState = &GameState{}
+	*nextState = *state
+	delta = &StateDelta{}
+
+	// Perform land tranding action
+	if err = validateLandTradingAction(nextState, action); err != nil {
+		return
+	}
+	nextState.Bushels = nextState.Bushels - state.LandPrice*action.LandsToBuy
+	nextState.Lands = nextState.Lands + action.LandsToBuy
+
+	// Perform the action to feed the population
+	if err = validateFeedingAction(nextState, action); err != nil {
+		return
+	}
+	numPeopleFed := min(nextState.Population*bushelsPerPerson, action.BushelsToFeed) / bushelsPerPerson
+	nextState.Bushels = nextState.Bushels - numPeopleFed*bushelsPerPerson
+	nextState.Population = numPeopleFed
+	delta.PeopleStarved = state.Population - nextState.Population
+	if u, e := uprising(state.Population, delta.PeopleStarved); u || e != nil {
+		if u {
+			err = &Uprising{Year: year}
+		} else {
+			err = e
+		}
+		return
+	}
+
+	// Perform the action to plant seed
+	if err = validateSeedingAction(nextState, action); err != nil {
+		return
+	}
+
+	// Calculate the harvestable lands and profits
+	maxLandsToHarvest := min(nextState.Population/landsPerPerson, nextState.Lands)
+	landsHarvested := min(maxLandsToHarvest, action.LandsToSeed)
+	nextState.Bushels = nextState.Bushels + landsHarvested*(state.LandProfit-bushelsPerLand)
+
+	// Now add randomized events to the mix
+	// Plague
+	delta.PeopleKilled, err = getPeopleKilledByPlague(nextState.Population)
+	if err != nil {
+		return
+	}
+	delta.HasPlague = delta.PeopleKilled != 0
+	nextState.Population = nextState.Population - delta.PeopleKilled
+
+	// Rat
+	delta.BushelsInfested, err = getInfestedBushels(nextState.Bushels)
+	if err != nil {
+		return
+	}
+	delta.HasRat = delta.BushelsInfested != 0
+	nextState.Bushels = nextState.Bushels - delta.BushelsInfested
+
+	// Newcomers
+	newcomers, err := getNewcomers()
+	if err != nil {
+		return
+	}
+	nextState.Population = nextState.Population + newcomers
+	delta.PeopleAdded = newcomers
+
+	// Generate next year land price and profit
+	nextState.LandPrice, err = getNextLandPrice()
+	if err != nil {
+		return
+	}
+	nextState.LandProfit, err = getNextLandProfit()
+	if err != nil {
+		return
+	}
+
+	// Increment year
+	nextYear = year + 1
+
+	// Done
+	return
+}
+
+func (action *GameAction) validate() error {
+	if action.BushelsToFeed < 0 {
+		return &ValueOutOfRange{Type: "BushelsToFeed", Reason: "Must be non-negative"}
+	}
+	if action.LandsToSeed < 0 {
+		return &ValueOutOfRange{Type: "LandsToSeed", Reason: "Must be non-negative"}
+	}
 	return nil
+}
+
+func validateLandTradingAction(state *GameState, action *GameAction) error {
+	// Validate if we have enough to sell
+	if action.LandsToBuy < 0 && state.Lands-action.LandsToBuy < 0 {
+		return &InsufficientLandsToSell{CurrentLands: state.Lands, RequestedLands: -action.LandsToBuy}
+	}
+
+	// Validate if we have enough bushels to buy
+	if action.LandsToBuy > 0 {
+		nextBushels := state.Bushels - state.LandPrice*action.LandsToBuy
+		if nextBushels < 0 {
+			return &InsufficientBushelsToBuyLands{CurrentBushels: state.Bushels, RequiredBushels: state.Bushels - nextBushels}
+		}
+	}
+
+	// All good
+	return nil
+}
+
+func validateFeedingAction(state *GameState, action *GameAction) error {
+	// Validate if we have enough bushels to feed
+	maxBushelsRequired := state.Population * bushelsPerPerson
+	bushelsToFeed := min(maxBushelsRequired, action.BushelsToFeed)
+	if bushelsToFeed > state.Bushels {
+		return &InsufficientBushelsToFeed{CurrentBushels: state.Bushels, RequestedBushels: bushelsToFeed}
+	}
+	return nil
+}
+
+func uprising(population, starved int) (ret bool, err error) {
+	// Validate
+	if population < 0 {
+		err = &ValueOutOfRange{Type: "population", Reason: "Must be non-negative"}
+	} else if starved < 0 {
+		err = &ValueOutOfRange{Type: "starved", Reason: "Must be non-negative"}
+	} else if starved > population {
+		err = &ValueOutOfRange{Type: "starved", Reason: fmt.Sprintf("Must be smaller than population %d", population)}
+	}
+	if err != nil {
+		return
+	}
+
+	// Return true if the starved population is more than uprising threshold
+	ret = (float32(starved) / float32(population)) > uprisingThreshold
+	return
+}
+
+func validateSeedingAction(state *GameState, action *GameAction) error {
+	// Validate that we have enough bushels to seed
+	requestedBushels := action.LandsToSeed * bushelsPerLand
+	if state.Bushels < requestedBushels {
+		return &InsufficientBushelsToSeed{CurrentBushels: state.Bushels, RequestedBushels: requestedBushels}
+	}
+	return nil
+}
+
+func getPeopleKilledByPlague(population int) (ret int, err error) {
+	// Validate
+	if population < 0 {
+		err = &ValueOutOfRange{Type: "population", Reason: "Must be non-negative"}
+		return
+	}
+
+	// Early exit if there is no plague
+	if rand.Float32() > plagueChance {
+		ret = 0
+	} else {
+		// Otherwise, kill half the population
+		ret = population / 2
+	}
+
+	return
+}
+
+func getInfestedBushels(bushels int) (ret int, err error) {
+	// Validate
+	if bushels < 0 {
+		err = &ValueOutOfRange{Type: "bushels", Reason: "Must be non-negative"}
+		return
+	}
+
+	// Early exit there is no rat infestation
+	if rand.Float32() > ratChance {
+		ret = 0
+	} else {
+		// Otherwise infest randomly between 10% to 40% of the bushels
+		ret = int(float32(bushels) * (rand.Float32()*0.3 + 0.1))
+	}
+	return
+}
+
+func getNewcomers() (int, error) {
+	return randIntInRangeInclusive(minNewcomers, maxNewcomers)
+}
+
+func getNextLandPrice() (int, error) {
+	return randIntInRangeInclusive(minLandPrice, maxLandPrice)
+}
+
+func getNextLandProfit() (int, error) {
+	return randIntInRangeInclusive(minLandProfit, maxLandProfit)
+}
+
+func randIntInRangeInclusive(lowInclusive, highInclusive int) (ret int, err error) {
+	// Validate and return corner case
+	if lowInclusive > highInclusive {
+		err = &ValueOutOfRange{Type: "lowInclusive", Reason: fmt.Sprintf("Must be smaller than highInclusive %d", highInclusive)}
+		return
+	} else if lowInclusive == highInclusive {
+		ret = lowInclusive
+		return
+	}
+
+	// Return a random number between low and high inclusively
+	ret = lowInclusive + rand.Intn(highInclusive-lowInclusive+1)
+	return
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
 }

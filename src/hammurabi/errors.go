@@ -6,7 +6,9 @@ import (
 
 // Uprising represents an error when more than 45% of the population is killed and the people overthrowed the player
 type Uprising struct {
-	Year int
+	Year          int
+	PeopleStarved int
+	Percentage    float32
 }
 
 // NilGameState represents an error when the game state is nil.
@@ -46,7 +48,7 @@ type InsufficientBushelsToSeed struct {
 }
 
 func (e *Uprising) Error() string {
-	return fmt.Sprintf("In year %d, more than 45%% of the population was starved. The people overthrowed you.", e.Year)
+	return fmt.Sprintf("In year %d, you starved %d people (%.2f%% of the population). The people overthrowed you.", e.Year, e.PeopleStarved, e.Percentage)
 }
 
 func (e *InsufficientBushelsToBuyLands) Error() string {

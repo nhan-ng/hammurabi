@@ -47,9 +47,16 @@ func runPlayCmd(cmd *cobra.Command, args []string) {
 		}
 
 		nextYear, nextState, nextDelta, err := h.Transition(year, state, action)
+		fmt.Println()
 		if err != nil {
+			if e, ok := err.(*h.Uprising); ok {
+				fmt.Println(e)
+				fmt.Printf("Due to this extreme mismanagement, you have not only been impeached and thrown out of office, but you have also been declared 'National Fink'!")
+				return
+			}
+
+			fmt.Println("O Great Hammurabi, surely you jest! We seem to have problem understanding your decisions!")
 			fmt.Println(err)
-			fmt.Println("There was an error. Please try again.")
 			continue
 		}
 

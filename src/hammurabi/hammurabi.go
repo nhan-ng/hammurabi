@@ -51,7 +51,7 @@ const (
 	maxLandPrice = 26
 
 	minLandProfit = 1
-	maxLandProfit = 4
+	maxLandProfit = 6
 
 	minNewcomers = 2
 	maxNewcomers = 5
@@ -93,6 +93,7 @@ func NewGame(maxYear int) (*GameState, *StateDelta) {
 // DisplayGameState displays textual representation of the game state and state delta.
 func DisplayGameState(year int, state *GameState, delta *StateDelta) {
 	// Display general information
+	fmt.Println()
 	fmt.Println("Hammurabi: I beg to report to you,")
 	fmt.Printf("In Year %d, %d people starved.\n", year, delta.PeopleStarved)
 	fmt.Printf("%d people came to the city.\n", delta.PeopleAdded)
@@ -111,6 +112,7 @@ func DisplayGameState(year int, state *GameState, delta *StateDelta) {
 
 // ReadActionInput reads the input and parse it to GameAction
 func ReadActionInput(reader *bufio.Reader) (action *GameAction, err error) {
+	fmt.Println()
 	fmt.Println("Input your action with the following format:")
 	fmt.Println("[LandsToBuy] [BushelsToFeed] [LandsToSeed]")
 	text, err := reader.ReadString('\n')
@@ -146,14 +148,16 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 		err = &NilGameAction{}
 		return
 	}
-	if err = action.validate(); err != nil {
+	if err = validate(action); err != nil {
 		return
 	}
 
 	// Initialize the next game state and delta
 	nextState = &GameState{}
-	*nextState = *state
 	delta = &StateDelta{}
+
+	// Make a copy of the current state
+	*nextState = *state
 
 	// Perform land tranding action
 	if err = validateLandTradingAction(nextState, action); err != nil {
@@ -172,7 +176,7 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	delta.PeopleStarved = state.Population - nextState.Population
 	if u, e := uprising(state.Population, delta.PeopleStarved); u || e != nil {
 		if u {
-			err = &Uprising{Year: year}
+			err = &Uprising{Year: year, PeopleStarved: delta.PeopleStarved, Percentage: float32(delta.PeopleStarved) / float32(state.Population) * 100.0}
 		} else {
 			err = e
 		}
@@ -231,7 +235,7 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	return
 }
 
-func (action *GameAction) validate() error {
+func validate(action *GameAction) error {
 	if action.BushelsToFeed < 0 {
 		return &ValueOutOfRange{Type: "BushelsToFeed", Reason: "Must be non-negative"}
 	}
@@ -243,7 +247,7 @@ func (action *GameAction) validate() error {
 
 func validateLandTradingAction(state *GameState, action *GameAction) error {
 	// Validate if we have enough to sell
-	if action.LandsToBuy < 0 && state.Lands-action.LandsToBuy < 0 {
+	if action.LandsToBuy < 0 && state.Lands+action.LandsToBuy < 0 {
 		return &InsufficientLandsToSell{CurrentLands: state.Lands, RequestedLands: -action.LandsToBuy}
 	}
 

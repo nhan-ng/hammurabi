@@ -47,6 +47,10 @@ type InsufficientBushelsToSeed struct {
 	RequestedBushels int
 }
 
+// InvalidInput represents an error when the input is invalid.
+type InvalidInput struct {
+}
+
 func (e *Uprising) Error() string {
 	return fmt.Sprintf("In year %d, you starved %d people (%.2f%% of the population). The people overthrowed you.", e.Year, e.PeopleStarved, e.Percentage)
 }
@@ -77,4 +81,8 @@ func (e *NilGameAction) Error() string {
 
 func (e *ValueOutOfRange) Error() string {
 	return fmt.Sprintf("Value of type '%s' is out of range. Reason %s.", e.Type, e.Reason)
+}
+
+func (e *InvalidInput) Error() string {
+	return "Invalid input"
 }

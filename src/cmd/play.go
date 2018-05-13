@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -35,18 +34,21 @@ func newPlayCmd() *cobra.Command {
 }
 
 func runPlayCmd(cmd *cobra.Command, args []string) {
-	state, delta := h.NewGame(maxYears)
+	game := h.NewGame(maxYears)
 	reader := bufio.NewReader(os.Stdin)
-	for year := 0; year < maxYears; {
-		h.DisplayGameState(year, state, delta)
+	for year := 1; year <= maxYears; {
+		game.DisplayGameState(year)
 
 		// Ask for input
-		action, err := h.ReadActionInput(reader)
+		_, err := game.ReadActionInput(reader)
 		if err != nil {
-			log.Fatalln(err)
+			fmt.Println(err)
+			fmt.Println("Once again?")
+			continue
 		}
 
-		nextYear, nextState, nextDelta, err := h.Transition(year, state, action)
+		// Transition to the new state
+		nextYear, _, _, err := game.Transition()
 		fmt.Println()
 		if err != nil {
 			if e, ok := err.(*h.Uprising); ok {
@@ -61,7 +63,5 @@ func runPlayCmd(cmd *cobra.Command, args []string) {
 		}
 
 		year = nextYear
-		state = nextState
-		delta = nextDelta
 	}
 }

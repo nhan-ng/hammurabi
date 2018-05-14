@@ -1,11 +1,8 @@
 package hammurabi
 
 import (
-	"bufio"
 	"fmt"
 	"math/rand"
-	"strconv"
-	"strings"
 )
 
 // GameState describes the current resource state of the game.
@@ -32,6 +29,19 @@ type StateDelta struct {
 	BushelsInfested int
 	HasRat          bool
 	HasPlague       bool
+}
+
+// Game represents a Hammurabi game
+type Game struct {
+	State  *GameState
+	Delta  *StateDelta
+	Action *GameAction
+	Year   int
+}
+
+// Hammurabi represents the minimal interface a Hammurabi game must have.
+type Hammurabi interface {
+	Transition() (int, *GameState, *StateDelta, error)
 }
 
 const (
@@ -67,7 +77,7 @@ const (
 )
 
 // NewGame creates a new game with the maximum number of years, aka turns.
-func NewGame(maxYear int) (*GameState, *StateDelta) {
+func NewGame(maxYear int) *Game {
 	// Create a fixed initial state delta
 	delta := &StateDelta{
 		PeopleStarved:   0,
@@ -87,58 +97,20 @@ func NewGame(maxYear int) (*GameState, *StateDelta) {
 		LandProfit: initialLandProfit,
 	}
 
-	return state, delta
-}
-
-// DisplayGameState displays textual representation of the game state and state delta.
-func DisplayGameState(year int, state *GameState, delta *StateDelta) {
-	// Display general information
-	fmt.Println()
-	fmt.Println("Hammurabi: I beg to report to you,")
-	fmt.Printf("In Year %d, %d people starved.\n", year, delta.PeopleStarved)
-	fmt.Printf("%d people came to the city.\n", delta.PeopleAdded)
-	fmt.Printf("The city population is now %d.\n", state.Population)
-	fmt.Printf("The city now owns %d acres.\n", state.Lands)
-	fmt.Printf("You harvested %d bushels per acre.\n", state.LandProfit)
-	if delta.HasRat {
-		fmt.Printf("Rats ate %d bushels.\n", delta.BushelsInfested)
+	// Initialize a new game
+	return &Game{
+		State: state,
+		Delta: delta,
+		Year:  1,
 	}
-	if delta.HasPlague {
-		fmt.Printf("Plague killed %d people.\n", delta.PeopleKilled)
-	}
-	fmt.Printf("You now have %d bushels in store.\n", state.Bushels)
-	fmt.Printf("Land is trading at %d bushels per acre.\n", state.LandPrice)
-}
-
-// ReadActionInput reads the input and parse it to GameAction
-func ReadActionInput(reader *bufio.Reader) (action *GameAction, err error) {
-	fmt.Println()
-	fmt.Println("Input your action with the following format:")
-	fmt.Println("[LandsToBuy] [BushelsToFeed] [LandsToSeed]")
-	text, err := reader.ReadString('\n')
-	if err != nil {
-		return
-	}
-
-	// Initialize game action
-	input := strings.Fields(text)
-
-	// Parse the input
-	action = &GameAction{}
-	action.LandsToBuy, err = strconv.Atoi(input[0])
-	if err != nil {
-		return
-	}
-	action.BushelsToFeed, err = strconv.Atoi(input[1])
-	if err != nil {
-		return
-	}
-	action.LandsToSeed, err = strconv.Atoi(input[2])
-	return
 }
 
 // Transition transitions the given game state to the next.
-func Transition(year int, state *GameState, action *GameAction) (nextYear int, nextState *GameState, delta *StateDelta, err error) {
+func (g *Game) Transition() (nextYear int, nextState *GameState, delta *StateDelta, err error) {
+	// Get the state and action
+	state := g.State
+	action := g.Action
+
 	// Validate parameters
 	if state == nil {
 		err = &NilGameState{}
@@ -176,7 +148,7 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	delta.PeopleStarved = state.Population - nextState.Population
 	if u, e := uprising(state.Population, delta.PeopleStarved); u || e != nil {
 		if u {
-			err = &Uprising{Year: year, PeopleStarved: delta.PeopleStarved, Percentage: float32(delta.PeopleStarved) / float32(state.Population) * 100.0}
+			err = &Uprising{Year: g.Year, PeopleStarved: delta.PeopleStarved, Percentage: float32(delta.PeopleStarved) / float32(state.Population) * 100.0}
 		} else {
 			err = e
 		}
@@ -229,7 +201,12 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	}
 
 	// Increment year
-	nextYear = year + 1
+	nextYear = g.Year + 1
+
+	// Update the game year
+	g.Year = nextYear
+	g.State = nextState
+	g.Delta = delta
 
 	// Done
 	return
@@ -365,7 +342,6 @@ func randIntInRangeInclusive(lowInclusive, highInclusive int) (ret int, err erro
 func min(a, b int) int {
 	if a < b {
 		return a
-	} else {
-		return b
 	}
+	return b
 }

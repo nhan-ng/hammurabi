@@ -1,11 +1,10 @@
 package hammurabi
 
 import (
-	"bufio"
 	"fmt"
 	"math/rand"
-	"strconv"
-	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // GameState describes the current resource state of the game.
@@ -32,6 +31,19 @@ type StateDelta struct {
 	BushelsInfested int
 	HasRat          bool
 	HasPlague       bool
+}
+
+// Game represents a Hammurabi game
+type Game struct {
+	State  *GameState
+	Delta  *StateDelta
+	Action *GameAction
+	Year   int
+}
+
+// Hammurabi represents the minimal interface a Hammurabi game must have.
+type Hammurabi interface {
+	Transition() (int, *GameState, *StateDelta, error)
 }
 
 const (
@@ -67,7 +79,7 @@ const (
 )
 
 // NewGame creates a new game with the maximum number of years, aka turns.
-func NewGame(maxYear int) (*GameState, *StateDelta) {
+func NewGame(maxYear int) *Game {
 	// Create a fixed initial state delta
 	delta := &StateDelta{
 		PeopleStarved:   0,
@@ -87,68 +99,30 @@ func NewGame(maxYear int) (*GameState, *StateDelta) {
 		LandProfit: initialLandProfit,
 	}
 
-	return state, delta
-}
-
-// DisplayGameState displays textual representation of the game state and state delta.
-func DisplayGameState(year int, state *GameState, delta *StateDelta) {
-	// Display general information
-	fmt.Println()
-	fmt.Println("Hammurabi: I beg to report to you,")
-	fmt.Printf("In Year %d, %d people starved.\n", year, delta.PeopleStarved)
-	fmt.Printf("%d people came to the city.\n", delta.PeopleAdded)
-	fmt.Printf("The city population is now %d.\n", state.Population)
-	fmt.Printf("The city now owns %d acres.\n", state.Lands)
-	fmt.Printf("You harvested %d bushels per acre.\n", state.LandProfit)
-	if delta.HasRat {
-		fmt.Printf("Rats ate %d bushels.\n", delta.BushelsInfested)
+	// Initialize a new game
+	return &Game{
+		State: state,
+		Delta: delta,
+		Year:  1,
 	}
-	if delta.HasPlague {
-		fmt.Printf("Plague killed %d people.\n", delta.PeopleKilled)
-	}
-	fmt.Printf("You now have %d bushels in store.\n", state.Bushels)
-	fmt.Printf("Land is trading at %d bushels per acre.\n", state.LandPrice)
-}
-
-// ReadActionInput reads the input and parse it to GameAction
-func ReadActionInput(reader *bufio.Reader) (action *GameAction, err error) {
-	fmt.Println()
-	fmt.Println("Input your action with the following format:")
-	fmt.Println("[LandsToBuy] [BushelsToFeed] [LandsToSeed]")
-	text, err := reader.ReadString('\n')
-	if err != nil {
-		return
-	}
-
-	// Initialize game action
-	input := strings.Fields(text)
-
-	// Parse the input
-	action = &GameAction{}
-	action.LandsToBuy, err = strconv.Atoi(input[0])
-	if err != nil {
-		return
-	}
-	action.BushelsToFeed, err = strconv.Atoi(input[1])
-	if err != nil {
-		return
-	}
-	action.LandsToSeed, err = strconv.Atoi(input[2])
-	return
 }
 
 // Transition transitions the given game state to the next.
-func Transition(year int, state *GameState, action *GameAction) (nextYear int, nextState *GameState, delta *StateDelta, err error) {
+func (g *Game) Transition() (nextYear int, nextState *GameState, delta *StateDelta, err error) {
+	// Get the state and action
+	state := g.State
+	action := g.Action
+
 	// Validate parameters
 	if state == nil {
-		err = &NilGameState{}
+		err = &nilGameState{}
 		return
 	}
 	if action == nil {
-		err = &NilGameAction{}
+		err = &nilGameAction{}
 		return
 	}
-	if err = validate(action); err != nil {
+	if err = errors.Wrap(validate(action), "validation failed"); err != nil {
 		return
 	}
 
@@ -160,31 +134,31 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	*nextState = *state
 
 	// Perform land tranding action
-	if err = validateLandTradingAction(nextState, action); err != nil {
+	if err = errors.Wrap(validateLandTradingAction(nextState, action), "land trading validation failed"); err != nil {
 		return
 	}
 	nextState.Bushels = nextState.Bushels - state.LandPrice*action.LandsToBuy
 	nextState.Lands = nextState.Lands + action.LandsToBuy
 
 	// Perform the action to feed the population
-	if err = validateFeedingAction(nextState, action); err != nil {
+	if err = errors.Wrap(validateFeedingAction(nextState, action), "feeding validation failed"); err != nil {
 		return
 	}
 	numPeopleFed := min(nextState.Population*bushelsPerPerson, action.BushelsToFeed) / bushelsPerPerson
 	nextState.Bushels = nextState.Bushels - numPeopleFed*bushelsPerPerson
 	nextState.Population = numPeopleFed
 	delta.PeopleStarved = state.Population - nextState.Population
-	if u, e := uprising(state.Population, delta.PeopleStarved); u || e != nil {
+	if u, e := isUprising(state.Population, delta.PeopleStarved); u || e != nil {
 		if u {
-			err = &Uprising{Year: year, PeopleStarved: delta.PeopleStarved, Percentage: float32(delta.PeopleStarved) / float32(state.Population) * 100.0}
+			err = &Uprising{Year: g.Year, PeopleStarved: delta.PeopleStarved, Percentage: float32(delta.PeopleStarved) / float32(state.Population) * 100.0}
 		} else {
-			err = e
+			err = errors.Wrap(e, "uprising validation failed")
 		}
 		return
 	}
 
 	// Perform the action to plant seed
-	if err = validateSeedingAction(nextState, action); err != nil {
+	if err = errors.Wrap(validateSeedingAction(nextState, action), "seeding validation failed"); err != nil {
 		return
 	}
 
@@ -197,6 +171,7 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	// Plague
 	delta.PeopleKilled, err = getPeopleKilledByPlague(nextState.Population)
 	if err != nil {
+		err = errors.Wrap(err, "validation failed")
 		return
 	}
 	delta.HasPlague = delta.PeopleKilled != 0
@@ -205,6 +180,7 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	// Rat
 	delta.BushelsInfested, err = getInfestedBushels(nextState.Bushels)
 	if err != nil {
+		err = errors.Wrap(err, "validation failed")
 		return
 	}
 	delta.HasRat = delta.BushelsInfested != 0
@@ -213,6 +189,7 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	// Newcomers
 	newcomers, err := getNewcomers()
 	if err != nil {
+		err = errors.Wrap(err, "validation failed")
 		return
 	}
 	nextState.Population = nextState.Population + newcomers
@@ -221,15 +198,22 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 	// Generate next year land price and profit
 	nextState.LandPrice, err = getNextLandPrice()
 	if err != nil {
+		err = errors.Wrap(err, "validation failed")
 		return
 	}
 	nextState.LandProfit, err = getNextLandProfit()
 	if err != nil {
+		err = errors.Wrap(err, "validation failed")
 		return
 	}
 
 	// Increment year
-	nextYear = year + 1
+	nextYear = g.Year + 1
+
+	// Update the game year
+	g.Year = nextYear
+	g.State = nextState
+	g.Delta = delta
 
 	// Done
 	return
@@ -237,10 +221,10 @@ func Transition(year int, state *GameState, action *GameAction) (nextYear int, n
 
 func validate(action *GameAction) error {
 	if action.BushelsToFeed < 0 {
-		return &ValueOutOfRange{Type: "BushelsToFeed", Reason: "Must be non-negative"}
+		return &valueOutOfRange{kind: "BushelsToFeed", reason: "Must be non-negative"}
 	}
 	if action.LandsToSeed < 0 {
-		return &ValueOutOfRange{Type: "LandsToSeed", Reason: "Must be non-negative"}
+		return &valueOutOfRange{kind: "LandsToSeed", reason: "Must be non-negative"}
 	}
 	return nil
 }
@@ -248,14 +232,14 @@ func validate(action *GameAction) error {
 func validateLandTradingAction(state *GameState, action *GameAction) error {
 	// Validate if we have enough to sell
 	if action.LandsToBuy < 0 && state.Lands+action.LandsToBuy < 0 {
-		return &InsufficientLandsToSell{CurrentLands: state.Lands, RequestedLands: -action.LandsToBuy}
+		return &insufficientLandsToSell{currentLands: state.Lands, requestedLands: -action.LandsToBuy}
 	}
 
 	// Validate if we have enough bushels to buy
 	if action.LandsToBuy > 0 {
 		nextBushels := state.Bushels - state.LandPrice*action.LandsToBuy
 		if nextBushels < 0 {
-			return &InsufficientBushelsToBuyLands{CurrentBushels: state.Bushels, RequiredBushels: state.Bushels - nextBushels}
+			return &insufficientBushelsToBuyLands{currentBushels: state.Bushels, requiredBushels: state.Bushels - nextBushels}
 		}
 	}
 
@@ -268,19 +252,19 @@ func validateFeedingAction(state *GameState, action *GameAction) error {
 	maxBushelsRequired := state.Population * bushelsPerPerson
 	bushelsToFeed := min(maxBushelsRequired, action.BushelsToFeed)
 	if bushelsToFeed > state.Bushels {
-		return &InsufficientBushelsToFeed{CurrentBushels: state.Bushels, RequestedBushels: bushelsToFeed}
+		return &insufficientBushelsToFeed{currentBushels: state.Bushels, requestedBushels: bushelsToFeed}
 	}
 	return nil
 }
 
-func uprising(population, starved int) (ret bool, err error) {
+func isUprising(population, starved int) (ret bool, err error) {
 	// Validate
 	if population < 0 {
-		err = &ValueOutOfRange{Type: "population", Reason: "Must be non-negative"}
+		err = &valueOutOfRange{kind: "population", reason: "Must be non-negative"}
 	} else if starved < 0 {
-		err = &ValueOutOfRange{Type: "starved", Reason: "Must be non-negative"}
+		err = &valueOutOfRange{kind: "starved", reason: "Must be non-negative"}
 	} else if starved > population {
-		err = &ValueOutOfRange{Type: "starved", Reason: fmt.Sprintf("Must be smaller than population %d", population)}
+		err = &valueOutOfRange{kind: "starved", reason: fmt.Sprintf("Must be smaller than population %d", population)}
 	}
 	if err != nil {
 		return
@@ -293,9 +277,10 @@ func uprising(population, starved int) (ret bool, err error) {
 
 func validateSeedingAction(state *GameState, action *GameAction) error {
 	// Validate that we have enough bushels to seed
-	requestedBushels := action.LandsToSeed * bushelsPerLand
+	maxBushelsRequired := min(state.Population*landsPerPerson, state.Lands) * bushelsPerLand
+	requestedBushels := min(maxBushelsRequired, action.LandsToSeed*bushelsPerLand)
 	if state.Bushels < requestedBushels {
-		return &InsufficientBushelsToSeed{CurrentBushels: state.Bushels, RequestedBushels: requestedBushels}
+		return &insufficientBushelsToSeed{currentBushels: state.Bushels, requestedBushels: requestedBushels}
 	}
 	return nil
 }
@@ -303,7 +288,7 @@ func validateSeedingAction(state *GameState, action *GameAction) error {
 func getPeopleKilledByPlague(population int) (ret int, err error) {
 	// Validate
 	if population < 0 {
-		err = &ValueOutOfRange{Type: "population", Reason: "Must be non-negative"}
+		err = &valueOutOfRange{kind: "population", reason: "Must be non-negative"}
 		return
 	}
 
@@ -321,7 +306,7 @@ func getPeopleKilledByPlague(population int) (ret int, err error) {
 func getInfestedBushels(bushels int) (ret int, err error) {
 	// Validate
 	if bushels < 0 {
-		err = &ValueOutOfRange{Type: "bushels", Reason: "Must be non-negative"}
+		err = &valueOutOfRange{kind: "bushels", reason: "Must be non-negative"}
 		return
 	}
 
@@ -350,7 +335,7 @@ func getNextLandProfit() (int, error) {
 func randIntInRangeInclusive(lowInclusive, highInclusive int) (ret int, err error) {
 	// Validate and return corner case
 	if lowInclusive > highInclusive {
-		err = &ValueOutOfRange{Type: "lowInclusive", Reason: fmt.Sprintf("Must be smaller than highInclusive %d", highInclusive)}
+		err = &valueOutOfRange{kind: "lowInclusive", reason: fmt.Sprintf("Must be smaller than highInclusive %d", highInclusive)}
 		return
 	} else if lowInclusive == highInclusive {
 		ret = lowInclusive
@@ -365,7 +350,6 @@ func randIntInRangeInclusive(lowInclusive, highInclusive int) (ret int, err erro
 func min(a, b int) int {
 	if a < b {
 		return a
-	} else {
-		return b
 	}
+	return b
 }

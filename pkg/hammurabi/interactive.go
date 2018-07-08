@@ -15,13 +15,13 @@ const (
 
 const (
 	intro = `
-Congratulations, you are the newest ruler of ancient Samaria, elected for a ten year term of office. Your duties are to dispsense food,
+Congratulations, you are the newest ruler of ancient Samaria, elected for %d-year term of office. Your duties are to dispsense food,
 direct farming, and buy and sell land as needed to support your people. Watch out for rat infestations and the plague! Gain is the general
 currency, measured in bushels. The following will help you in your decisions:
 
-- Each person needs at least 20 bushels of grain per year to survive.
-- Each person can farm at most 10 acres of land.
-- It takes 1 bushel of grain to farm an acre of land.
+- Each person needs at least %d bushels of grain per year to survive.
+- Each person can farm at most %d acres of land.
+- It takes %d bushel of grain to farm an acre of land.
 - The mark price for land fluctuates yearly.
 
 Rule wisely and you will be showered with appreciation at the end of your term. Rule poorly and you will be kicked out of office!
@@ -30,15 +30,21 @@ Rule wisely and you will be showered with appreciation at the end of your term. 
 
 // InteractiveHammurabi represents the minimal interface for an interactive Hammurabi game.
 type InteractiveHammurabi interface {
-	DisplayIntro()
+	DisplayIntro() error
 	DisplayGameState(year int) error
 	ReadActionInput(reader *bufio.Reader) (*GameAction, error)
 	Hammurabi
 }
 
 // DisplayIntro displays introduction text of the game.
-func (g *Game) DisplayIntro() {
-	fmt.Println(intro)
+func (g *Game) DisplayIntro(year int) error {
+	// Validate
+	if year < 1 && year > g.Year {
+		return &valueOutOfRange{kind: "year", reason: fmt.Sprintf("Should be within range [%d, %d].", 0, g.Year)}
+	}
+
+	fmt.Printf(intro, year, bushelsPerPerson, landsPerPerson, bushelsPerLand)
+	return nil
 }
 
 // DisplayGameState displays textual representation of the game state and state delta.

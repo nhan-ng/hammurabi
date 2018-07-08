@@ -8,11 +8,7 @@ language: go
 # updates. Any older versions be considered deprecated. Don't bother testing
 # with them.
 go:
-  - 1.10.x
-
-install:
-  - go get -d -t -v ./...
-  - go build -v ./...
+  - "1.10.x"
 
 script:
   - go test -v ./...

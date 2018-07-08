@@ -270,7 +270,8 @@ func uprising(population, starved int) (ret bool, err error) {
 
 func validateSeedingAction(state *GameState, action *GameAction) error {
 	// Validate that we have enough bushels to seed
-	requestedBushels := action.LandsToSeed * bushelsPerLand
+	maxBushelsRequired := min(state.Population*landsPerPerson, state.Lands) * bushelsPerLand
+	requestedBushels := min(maxBushelsRequired, action.LandsToSeed*bushelsPerLand)
 	if state.Bushels < requestedBushels {
 		return &InsufficientBushelsToSeed{CurrentBushels: state.Bushels, RequestedBushels: requestedBushels}
 	}

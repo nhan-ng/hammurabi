@@ -3,6 +3,8 @@ package hammurabi
 import (
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func TestValidateAction(t *testing.T) {
@@ -41,7 +43,7 @@ func TestValidateAction(t *testing.T) {
 
 	// Act
 	for _, tc := range testCases {
-		actualError := validate(tc.action)
+		actualError := errors.Cause(validate(tc.action))
 		if tc.expectError && actualError == nil {
 			t.Errorf("[%s] expects error, but got nil", tc.name)
 		}
@@ -62,18 +64,18 @@ func TestValidateLandTradingAction(t *testing.T) {
 			name:   "Insufficient lands to sell",
 			state:  &GameState{Lands: 10},
 			action: &GameAction{LandsToBuy: -20},
-			expectedError: &InsufficientLandsToSell{
-				CurrentLands:   10,
-				RequestedLands: 20,
+			expectedError: &insufficientLandsToSell{
+				currentLands:   10,
+				requestedLands: 20,
 			},
 		},
 		{
 			name:   "Insufficient bushels to buy",
 			state:  &GameState{Bushels: 100, LandPrice: 20},
 			action: &GameAction{LandsToBuy: 100},
-			expectedError: &InsufficientBushelsToBuyLands{
-				CurrentBushels:  100,
-				RequiredBushels: 2000,
+			expectedError: &insufficientBushelsToBuyLands{
+				currentBushels:  100,
+				requiredBushels: 2000,
 			},
 		},
 		{
@@ -92,7 +94,7 @@ func TestValidateLandTradingAction(t *testing.T) {
 
 	// Act
 	for _, tc := range testCases {
-		actualError := validateLandTradingAction(tc.state, tc.action)
+		actualError := errors.Cause(validateLandTradingAction(tc.state, tc.action))
 
 		// Assert the error
 		if !reflect.DeepEqual(actualError, tc.expectedError) {
@@ -117,9 +119,9 @@ func TestValidateFeedingAction(t *testing.T) {
 			action: &GameAction{
 				BushelsToFeed: bushelsPerPerson * 10, // Asking to feed 10
 			},
-			expectedError: &InsufficientBushelsToFeed{
-				CurrentBushels:   bushelsPerPerson * 5,
-				RequestedBushels: bushelsPerPerson * 10,
+			expectedError: &insufficientBushelsToFeed{
+				currentBushels:   bushelsPerPerson * 5,
+				requestedBushels: bushelsPerPerson * 10,
 			},
 		},
 		{
@@ -148,7 +150,7 @@ func TestValidateFeedingAction(t *testing.T) {
 
 	// Act
 	for _, tc := range testCases {
-		actualError := validateFeedingAction(tc.state, tc.action)
+		actualError := errors.Cause(validateFeedingAction(tc.state, tc.action))
 
 		// Assert the error
 		if !reflect.DeepEqual(actualError, tc.expectedError) {
@@ -174,9 +176,9 @@ func TestValidateSeedingAction(t *testing.T) {
 			action: &GameAction{
 				LandsToSeed: 10,
 			},
-			expectedError: &InsufficientBushelsToSeed{
-				CurrentBushels:   bushelsPerLand * 5,
-				RequestedBushels: bushelsPerLand * 10,
+			expectedError: &insufficientBushelsToSeed{
+				currentBushels:   bushelsPerLand * 5,
+				requestedBushels: bushelsPerLand * 10,
 			},
 		},
 		{
@@ -207,7 +209,7 @@ func TestValidateSeedingAction(t *testing.T) {
 
 	// Act
 	for _, tc := range testCases {
-		actualError := validateSeedingAction(tc.state, tc.action)
+		actualError := errors.Cause(validateSeedingAction(tc.state, tc.action))
 
 		// Assert the error
 		if !reflect.DeepEqual(actualError, tc.expectedError) {

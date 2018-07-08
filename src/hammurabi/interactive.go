@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -22,7 +24,7 @@ type InteractiveHammurabi interface {
 func (g *Game) DisplayGameState(year int) error {
 	// Get the current state from the given year
 	if year < 1 && year > g.Year {
-		return &ValueOutOfRange{Type: "year", Reason: fmt.Sprintf("Should be within range [%d, %d].", 0, g.Year)}
+		return &valueOutOfRange{kind: "year", reason: fmt.Sprintf("Should be within range [%d, %d].", 0, g.Year)}
 	}
 
 	// Get the previous delta and the current state
@@ -63,7 +65,7 @@ func (g *Game) ReadActionInput(reader *bufio.Reader) (action *GameAction, err er
 	// Initialize game action
 	input := strings.Fields(text)
 	if len(input) != requiredInput {
-		err = &InvalidInput{}
+		err = &invalidInput{}
 		return
 	}
 
@@ -71,14 +73,17 @@ func (g *Game) ReadActionInput(reader *bufio.Reader) (action *GameAction, err er
 	action = &GameAction{}
 	action.LandsToBuy, err = strconv.Atoi(input[0])
 	if err != nil {
+		err = errors.Wrap(err, "validation failed")
 		return
 	}
 	action.BushelsToFeed, err = strconv.Atoi(input[1])
 	if err != nil {
+		err = errors.Wrap(err, "validation failed")
 		return
 	}
 	action.LandsToSeed, err = strconv.Atoi(input[2])
 	if err != nil {
+		err = errors.Wrap(err, "validation failed")
 		return
 	}
 

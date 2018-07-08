@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"./cmd"
+	"github.com/nhan-ng/hammurabi/pkg/cmd"
 )
 
 const (

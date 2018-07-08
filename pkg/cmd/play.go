@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -28,19 +29,28 @@ func newPlayCmd() *cobra.Command {
 	}
 
 	// Add flags
-	// playCmd.Flags().IntVarP(&maxYears, "years", "y", 10, "Max number of years to play")
 	playCmd.Flags().IntVarP(&maxYears, "years", "y", 10, "Max number of years to play")
 	return playCmd
 }
 
 func runPlayCmd(cmd *cobra.Command, args []string) {
+	// Initialize the game
 	game := h.NewGame(maxYears)
+	err := game.DisplayIntro(maxYears)
+	if err != nil {
+		log.Fatal(err)
+	}
 	reader := bufio.NewReader(os.Stdin)
+
+	// Game loop
 	for year := 1; year <= maxYears; {
-		game.DisplayGameState(year)
+		err = game.DisplayGameState(year)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		// Ask for input
-		_, err := game.ReadActionInput(reader)
+		_, err = game.ReadActionInput(reader)
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("Once again?")

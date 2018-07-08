@@ -28,14 +28,17 @@ func newPlayCmd() *cobra.Command {
 	}
 
 	// Add flags
-	// playCmd.Flags().IntVarP(&maxYears, "years", "y", 10, "Max number of years to play")
 	playCmd.Flags().IntVarP(&maxYears, "years", "y", 10, "Max number of years to play")
 	return playCmd
 }
 
 func runPlayCmd(cmd *cobra.Command, args []string) {
+	// Initialize the game
 	game := h.NewGame(maxYears)
+	game.DisplayIntro()
 	reader := bufio.NewReader(os.Stdin)
+
+	// Game loop
 	for year := 1; year <= maxYears; {
 		game.DisplayGameState(year)
 

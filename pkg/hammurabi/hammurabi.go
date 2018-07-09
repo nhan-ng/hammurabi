@@ -33,12 +33,12 @@ type StateDelta struct {
 	HasPlague       bool
 }
 
-// Game represents a Hammurabi game
-type Game struct {
-	State  *GameState
-	Delta  *StateDelta
-	Action *GameAction
-	Year   int
+// game represents a Hammurabi game
+type game struct {
+	state  *GameState
+	delta  *StateDelta
+	action *GameAction
+	year   int
 }
 
 // Hammurabi represents the minimal interface a Hammurabi game must have.
@@ -79,39 +79,15 @@ const (
 )
 
 // NewGame creates a new game with the maximum number of years, aka turns.
-func NewGame(maxYear int) *Game {
-	// Create a fixed initial state delta
-	delta := &StateDelta{
-		PeopleStarved:   0,
-		PeopleKilled:    0,
-		PeopleAdded:     initialNewPeople,
-		BushelsInfested: initialBushelsInfested,
-		HasRat:          true,
-		HasPlague:       false,
-	}
-
-	// Create a fixed initial state
-	state := &GameState{
-		Bushels:    initialBushels,
-		Population: initialPopulation,
-		Lands:      initialLands,
-		LandPrice:  initialLandPrice,
-		LandProfit: initialLandProfit,
-	}
-
-	// Initialize a new game
-	return &Game{
-		State: state,
-		Delta: delta,
-		Year:  1,
-	}
+func NewGame(maxYear int) Hammurabi {
+	return newGame(maxYear)
 }
 
 // Transition transitions the given game state to the next.
-func (g *Game) Transition() (nextYear int, nextState *GameState, delta *StateDelta, err error) {
+func (g *game) Transition() (nextYear int, nextState *GameState, delta *StateDelta, err error) {
 	// Get the state and action
-	state := g.State
-	action := g.Action
+	state := g.state
+	action := g.action
 
 	// Validate parameters
 	if state == nil {
@@ -150,7 +126,7 @@ func (g *Game) Transition() (nextYear int, nextState *GameState, delta *StateDel
 	delta.PeopleStarved = state.Population - nextState.Population
 	if u, e := isUprising(state.Population, delta.PeopleStarved); u || e != nil {
 		if u {
-			err = &Uprising{Year: g.Year, PeopleStarved: delta.PeopleStarved, Percentage: float32(delta.PeopleStarved) / float32(state.Population) * 100.0}
+			err = &Uprising{Year: g.year, PeopleStarved: delta.PeopleStarved, Percentage: float32(delta.PeopleStarved) / float32(state.Population) * 100.0}
 		} else {
 			err = errors.Wrap(e, "uprising validation failed")
 		}
@@ -208,15 +184,43 @@ func (g *Game) Transition() (nextYear int, nextState *GameState, delta *StateDel
 	}
 
 	// Increment year
-	nextYear = g.Year + 1
+	nextYear = g.year + 1
 
 	// Update the game year
-	g.Year = nextYear
-	g.State = nextState
-	g.Delta = delta
+	g.year = nextYear
+	g.state = nextState
+	g.delta = delta
 
 	// Done
 	return
+}
+
+func newGame(maxYear int) *game {
+	// Create a fixed initial state delta
+	delta := &StateDelta{
+		PeopleStarved:   0,
+		PeopleKilled:    0,
+		PeopleAdded:     initialNewPeople,
+		BushelsInfested: initialBushelsInfested,
+		HasRat:          true,
+		HasPlague:       false,
+	}
+
+	// Create a fixed initial state
+	state := &GameState{
+		Bushels:    initialBushels,
+		Population: initialPopulation,
+		Lands:      initialLands,
+		LandPrice:  initialLandPrice,
+		LandProfit: initialLandProfit,
+	}
+
+	// Initialize a new game
+	return &game{
+		state: state,
+		delta: delta,
+		year:  1,
+	}
 }
 
 func validate(action *GameAction) error {

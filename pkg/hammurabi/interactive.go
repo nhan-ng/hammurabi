@@ -36,8 +36,8 @@ type InteractiveHammurabi interface {
 	Hammurabi
 }
 
-// NewInteractiveGame creates a new game with the maximum number of years, aka turns.
-func NewInteractiveGame(maxYear int) InteractiveHammurabi {
+// NewInteractiveHammurabi creates a new game with the maximum number of years, aka turns.
+func NewInteractiveHammurabi(maxYear int) InteractiveHammurabi {
 	// Initialize a new game
 	return newGame(maxYear)
 }

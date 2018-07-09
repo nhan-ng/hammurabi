@@ -78,8 +78,8 @@ const (
 	initialBushelsInfested = 200
 )
 
-// NewGame creates a new game with the maximum number of years, aka turns.
-func NewGame(maxYear int) Hammurabi {
+// NewHammurabi creates a new game with the maximum number of years, aka turns.
+func NewHammurabi(maxYear int) Hammurabi {
 	return newGame(maxYear)
 }
 

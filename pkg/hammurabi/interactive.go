@@ -30,17 +30,23 @@ Rule wisely and you will be showered with appreciation at the end of your term. 
 
 // InteractiveHammurabi represents the minimal interface for an interactive Hammurabi game.
 type InteractiveHammurabi interface {
-	DisplayIntro() error
+	DisplayIntro(year int) error
 	DisplayGameState(year int) error
 	ReadActionInput(reader *bufio.Reader) (*GameAction, error)
 	Hammurabi
 }
 
+// NewInteractiveHammurabi creates a new game with the maximum number of years, aka turns.
+func NewInteractiveHammurabi(maxYear int) InteractiveHammurabi {
+	// Initialize a new game
+	return newGame(maxYear)
+}
+
 // DisplayIntro displays introduction text of the game.
-func (g *Game) DisplayIntro(year int) error {
+func (g *game) DisplayIntro(year int) error {
 	// Validate
-	if year < 1 && year > g.Year {
-		return &valueOutOfRange{kind: "year", reason: fmt.Sprintf("Should be within range [%d, %d].", 0, g.Year)}
+	if year < 1 && year > g.year {
+		return &valueOutOfRange{kind: "year", reason: fmt.Sprintf("Should be within range [%d, %d].", 0, g.year)}
 	}
 
 	fmt.Printf(intro, year, bushelsPerPerson, landsPerPerson, bushelsPerLand)
@@ -48,15 +54,15 @@ func (g *Game) DisplayIntro(year int) error {
 }
 
 // DisplayGameState displays textual representation of the game state and state delta.
-func (g *Game) DisplayGameState(year int) error {
+func (g *game) DisplayGameState(year int) error {
 	// Get the current state from the given year
-	if year < 1 && year > g.Year {
-		return &valueOutOfRange{kind: "year", reason: fmt.Sprintf("Should be within range [%d, %d].", 0, g.Year)}
+	if year < 1 && year > g.year {
+		return &valueOutOfRange{kind: "year", reason: fmt.Sprintf("Should be within range [%d, %d].", 0, g.year)}
 	}
 
 	// Get the previous delta and the current state
-	delta := g.Delta
-	state := g.State
+	delta := g.delta
+	state := g.state
 
 	// Display general information
 	fmt.Println()
@@ -80,7 +86,7 @@ func (g *Game) DisplayGameState(year int) error {
 }
 
 // ReadActionInput reads the input and parse it to GameAction
-func (g *Game) ReadActionInput(reader *bufio.Reader) (action *GameAction, err error) {
+func (g *game) ReadActionInput(reader *bufio.Reader) (action *GameAction, err error) {
 	fmt.Println()
 	fmt.Println("Input your action with the following format:")
 	fmt.Println("[LandsToBuy] [BushelsToFeed] [LandsToSeed]")
@@ -115,6 +121,6 @@ func (g *Game) ReadActionInput(reader *bufio.Reader) (action *GameAction, err er
 	}
 
 	// Otherwise set the action
-	g.Action = action
+	g.action = action
 	return
 }

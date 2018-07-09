@@ -35,7 +35,7 @@ func newPlayCmd() *cobra.Command {
 
 func runPlayCmd(cmd *cobra.Command, args []string) {
 	// Initialize the game
-	game := h.NewGame(maxYears)
+	game := h.NewInteractiveHammurabi(maxYears)
 	err := game.DisplayIntro(maxYears)
 	if err != nil {
 		log.Fatal(err)

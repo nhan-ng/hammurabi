@@ -1,6 +1,11 @@
 # Hammurabi #
 Hammurabi is CLI application written in Golang for playing the classic text-based strategy game, whether by human or AI.
 
+| Branch | Build Status |
+|--------|-------------:|
+|master  |[![Build Status](https://travis-ci.com/nhan-ng/hammurabi.svg?branch=master)](https://travis-ci.com/nhan-ng/hammurabi)|
+|develop |[![Build Status](https://travis-ci.com/nhan-ng/hammurabi.svg?branch=develop)](https://travis-ci.com/nhan-ng/hammurabi)|
+
 # Table of Contents #
 - [Hammurabi](#hammurabi)
 - [Table of Contents](#table-of-contents)

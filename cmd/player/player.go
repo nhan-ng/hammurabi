@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/nhan-ng/hammurabi/cmd/console-player/app"
+	"github.com/nhan-ng/hammurabi/cmd/player/app"
 )
 
 func main() {

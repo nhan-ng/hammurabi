@@ -1,4 +1,4 @@
-module github.com/nhan-ng/hammurabi/cmd/player
+module github.com/nhan-ng/hammurabi/cmd/cli
 
 require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

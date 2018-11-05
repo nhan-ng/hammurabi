@@ -26,5 +26,5 @@ git:
 install: true
 
 script:
-  - go build -v ./..
+  - go build -v ./...
   - go test -v ./...
